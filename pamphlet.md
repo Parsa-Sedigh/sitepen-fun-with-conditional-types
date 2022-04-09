@@ -280,6 +280,43 @@ trying to extract certain constituents of unions.
 Question: Can I offer some completions on a string value?
 printColor('#FF00FF');
 printColor('');<we need some completions here that shows blue, red>
-Answer: Naive answer: `string | 'red' | 'blue'`
+Answer: Naive answer: `string | 'red' | 'blue'`(wouldn't work well).
+So we have a function that takes a string parameter, but this string parameter while it CAN be any string, there are certain preferred strings.
+While we can pass in any hex value which is string, we would like to suggest red and blue. 
 
-TODO: Till 38:10
+Approach 1 doesn't work why?
+The answer has to do with how unions and intersections are reduced in TS.
+
+If we have: string | 'red' | 'blue', subtype reduction applies to this which subtype reduction is:
+If D is sub set of P, then D | P is P. Because we have this parent set which contains all the values that D also contains. 
+So if we have string | 'red' | 'blue', 'red' and 'blue' are superflawess. They don't add anything, because string already contains the values 'red' and 
+'blue', so there's no reason to specify them separately. So this just reduces to string. So we don't get code completion.
+
+So we need a way to prevent TS from reducing string | 'red' | 'blue' union to just string without actually changing the meaning of what is present here.
+The answer is to intersect string(only string not union) with {}.
+Now this solution doesn't add a lot of information to that string. It doesn't change it in any signifant way. Any string will still be 
+compatible with string and empty object({}), but it does prevent subtype reduction. TS will not see that those string literal types are contained within
+the set described by string & {} . So now we get code completion.
+
+Let's look at another application of intersections:
+# branded types
+Question: How can I ensure that a string if a file path? (What we want to do is we want to take sth that is usually represented as a primitive type,
+string or number and we want to ensure that it's hard to create a string literal or a number literal that is compatible with this new type).
+Answer: We can use branded types.
+
+TODO: ~~Till 42:00~~
+
+
+
+
+
+
+
+
+
+
+
+Learn: If we want to iterate over EACH CONSTITUENT of a union, we need to use a conditional type on that union that ALWAYS evaluates
+to true. So if U is a union type and we want to iterate over each constituent type of this union, we use a conditional type on this union
+that always evaluates to true:
+type T = U extends U ? (here, we can take some decision to assign what type to each constituent) : never;
