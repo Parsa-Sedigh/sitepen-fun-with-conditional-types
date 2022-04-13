@@ -304,7 +304,113 @@ Question: How can I ensure that a string if a file path? (What we want to do is 
 string or number and we want to ensure that it's hard to create a string literal or a number literal that is compatible with this new type).
 Answer: We can use branded types.
 
-TODO: ~~Till 42:00~~
+We need to find a way to ensure that string literals which are of type string, are not compatible with our Path type. How can we do that?
+If the string literal is missing a property that our Path type requires, then we can ensure this incompatibility. But how we can do that?
+Simplest way to do it, is to intersect string with an object type that has a property. This property won't actually be there at runtime, it doesn't have
+to be, it's just there for the type checker, so we can keep track of what is a Path and what isn't a Path.
+Let's call this property __brand and for now let's type it as any and we will see sth better to use there, but for now this works.
+Now you can see src variable can no longer be passed to copy() . Because the type string does not have that __brand property.
+I said we want to ensure that people check before they assume a string is actually a Path. How we can do this?
+We can use a function call it isPath that accepts a string and retuns a boolean. Now perform the necessary checks to find out if the given string is a Path.
+Let's say it is a Path and we put that function into an if statement, but still TS is not aware that this influenced the the type of p.
+Now if we could use a type assertion when passing src to copy() inside the if statement, this works. But type assetions by definition are not 100 safe,
+because we have:
+if (isPath(src)) {
+    copy(src as Path, dest as Path);
+}
+So although there is no errors reporting from TS, we only checked src with isPath(), not dest. It would be great if there would be an automatic
+way for the type information to flow from isPath() to the true branch of the if statement and the answer is there is such a way and they're called
+custom type guards. So instead of using `boolean` as the return type,  we can use a specialized syntax that will let TS know that this function changes
+the type of p. We can use `p is Path` as return type of that function.
+The runtime return type of this function is not influenced in any way, isPath() returns a boolean.
+This specialized syntax will let TS know that isPath() is a custom type guard, namely that it impacts the type of it's parameter p.
+Now we can remove type assertions. But we need to check for both src and dest with isPath().
+
+Complementary to custom type guards, there are custom assertions, like assertPath() .
+Now after assertPath() is called with the arg x, we know x would be of type Path. Because if it wasn't it would be thrown and we would never reach
+the lines after calling assertPath() . But the TS compiler doesn't know this yet! But there is a way to let it know, namely we can add a type annotation as
+the return type of assertPath() and we can say: assets p is Path .
+
+So with assert functions we can throw a runtime error if the assertion is not true(is not of the type that we're asserting against).
+
+So these were two ways we can check types either by performing a check and using it in a conditional like if statements(custom type guards approach),
+or by asserting it is a Path and throwing an error if it is not.
+
+Remember that we said the type of __brand property doesn't really matter? Well it doesn't matter for compatibility between string and our branded type and 
+it doesn't matter for compatibility between two Paths. However it does matter if we define another type(let's call it Guid or globally unique identifier).
+Now if this new type has the same property and it's of the same type, those two types describe the same kind of object(or in our terminology, the same set), they 
+are strings that also have __brand property. So these two sets are basically the same set(type). So now if we replace the type of source in copy function from 
+Path to Guid, no error will occur because both those types are actually the same type. How we can avoid this?
+We need to be more specific here(type of the __brand property) and instead of `any` as the type, use a more specific type, preferably a 
+descriptive one. So replace any with string literal "Path" for the Path type and ... .
+So now we have a incompatibility between Guid and Path because the types are different on the __brand property. This is what we wanted.
+
+There's another solution is to use a unique symbol. The benefit of this solution is that you have a stronger guarantee that nobody else will use the 
+same string as you. Unique symbols can be defined in TS and TS can ensure that no other symbol is compatible with that particular unique symbol, except the one
+that you declared at that specific code location.
+
+# What are branded types
+- they are a primitive type intersected with an object type in order to ensure that the primitive literals are not directly compatible with this new branded
+type.
+- The object type that ensures that the resulting type is no longer compatible with the primitive type
+    - this can be done with a string literal property(like: __brand: 'Path').
+    - or can be done with a unique symbol
+    - or can be done with any but that exposes you to easy aliasing by other types
+
+Other applications:
+- generally enforce constraints on primitive types that can be traced in the type system.
+    - a `number` is a database id. So we can create numbers that are guaranteed to be DB ids.
+    - a `string` is a GUID. We can create strings that are guaranteed to be GUIDs.
+    
+So whenever we have a primitive type that also has an extra meaning, you can think about branded types.
+
+Type operators:
+
+# Getting the keys of a type
+Question: How can we get a type with all the keys in an object type?
+Answer: Using the keyof operator
+
+# Getting the type of a variable
+Question: How can we get a type of a variable?
+Answer: Use the typeof operator
+
+Important: keyof operator always acts on a type, but typeof operator acts on variables.
+Important: The typeof operator although it shares it's name with the JS typeof operator, it's different from it. The JS typeof operator will return a 
+string that represents the runtime type of the variable. However, the TS typeof operator will return the TS type of whatever variable it's given. 
+If we have the typeof operator that's used in a expression which that expression will appear at runtime or will be evaluated at runtime, that means 
+that's the JS version.
+For example:
+```typescript
+if (typeof env === 'object') {
+    
+}
+```
+This typeof operator we used here, is the JS version of typeof operator, while if we used typeof inside a type or a type annotation, that means it's TS typeof 
+operator which gives us full TS type of any variable.
+
+# Indexed types
+Question: (If we already have a type) How can we get a type(that represents the union) of all property values in an object?
+```typescript
+type Book = {
+    pages: number;
+    fontSize: number;
+    name: string;
+    author: string;
+};
+type R = ValueOf<Book>; // we want R to be string | number
+```
+For now let's see how we can get a type of a specific property. We can use an indexed type.
+
+Note: [] is the indexing operator when used with an object: object['<a property of object>'] .
+
+# Anatomy of indexed type
+- it has a form of: T[K] where:
+  - T can be any type expression like: Book, typeof env . 
+  - K can be any valid type expression that can index T. For example for Book, K would be "name" or for arrays, it(K) can be a number.
+- One interesting property of the indexing operation, is that it distributes over K if K is a union.
+
+
+TODO: ~~Till 56:50~~
 
 
 
