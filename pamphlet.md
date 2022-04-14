@@ -408,18 +408,88 @@ Note: [] is the indexing operator when used with an object: object['<a property 
   - T can be any type expression like: Book, typeof env . 
   - K can be any valid type expression that can index T. For example for Book, K would be "name" or for arrays, it(K) can be a number.
 - One interesting property of the indexing operation, is that it distributes over K if K is a union.
+So T[K1 | K2 | ... Kn]  becomes T[K1] | T[K2] | ... T[Kn]
+We can use the distributive aspect of indexed types for the answer of the question. The answer is we can an indexing operation that indexes over
+all the properties of Book. So we need to use all the properties of Book for the union to index it.
 
+Learn: The keyof operator gives us a union of all keys of an object.
 
+# Safe get function
+Question: How can we make a function to get a value in an object safety?
+Answer: Use indexed access types, keyof and a generic function. Look at 13th file.
 TODO: ~~Till 56:50~~
 
+Usually the types of parameters are defined at the moment when you define your function and that is their final type.
 
+With generic functions, we can DEFER the decision as to exactly what type a parameter will have, until that function gets invoked(until it's call side).
+In our example, K extends keyof Env means K must be one of the properties of the Env type. So whoever is calling that function should be careful to only
+provide a string for s that is among the properties of env.
 
+By passing a string to version 2 function, the type of passed string would be string, but in version 3, for example by passing 'SERVER', the inferred type of 
+generic would be string literal 'SERVER' not string!
 
+# Some predefined mapped types:
+- Partial: Creates a new type with the same properties, but will all properties being marked as optional.
+- Record: It takes a union of keys and a type and it creates a new type with all of those keys and the type of the keys is going to be the type that was
+  passed to the second parameter of Record. So it creates a type with a given set of properties, all of the same type
+EX)
+```typescript
+type ValidPerson = Record<'name' | 'age' | 'company', boolean>;
+type ValidPerson2 = Record<keyof Person, boolean>;
+```
+- Readonly: Creates a type with the same properties but with all properties **readonly**.
+- Required: Creates a type with the same properties but will all properties **required**.
+- Pick: Picks a set of properties from the given type. Pick will preserve the shape and structure of the original type, so if a field was optional in the
+  original type, it will be optional in the Pick result. Or if it was readonly, the result type would also have that property with readonly modifier.
+```typescript
+type P = Pick<Person, 'name' | 'company'>
+```
 
+What makes these mentioned types, mapped types?
+Because in definition of them, they share a syntax that is for mapped types.
 
+Let's see sth that we can't solve just using these predefined mapped types:
+# Custom mapped types
+Question: How can we create a type with return type of all functions in another type? (We want a new type with the same keys but for each key we have
+the return type of the original function instead of function itself.)
+Answer: Use a CUSTOM mapped type in conjunction with conditional type `ReturnType`.
 
+First let's see the anatomy of a mapped type by looking at the definition of Record<T, K>.
 
+When we have [P in K]: T in a mapped type, K is going to be either a string literal type or a union of keys for our resulting type.
+Now what is P here? 
+It's some magic syntax. Mapped types have their own dedicated syntax. 
+P is a type parameter. So what we're introducing before the `in` keyword in the [] of mapped type, is a type parameter which in this case is named P.
+You can think of `P` as the variable in a for loop. Here, P is gonna be that variable that takes EACH value inside of our union or literal string type which
+in this case is named K.
 
+We can use P as a type to index into K like:  
+```typescript
+type T = {[P in keyof K]: K[P]};
+``` 
+and T is a type that looks exactly as K.
+
+P<T extends {[n: string]: (...a: any) => any }> means:
+T extends sth that if it's indexable with any string, the type of that indexing operation is gonna be a function takes any 
+number of params and returns anything.
+
+# Basic anatomy of a mapped type:
+- Basic anatomy of a mapped type: [[P in K]: U]
+  - P in K take each P in K
+    - K is usually a union that will contain valid types that represent property names, so it can be strings, numbers or unique symbols(an example for K
+      is: 'name' | 'field')
+    - P will be each constituent of the union in turn(P in the first time would be 'name', then 'field')
+    - P is a type parameter and can be used anywhere a type would be used inside the type expression U
+  - U is the type of the property P. So for each consistent in the union K(which is going to be union of 'name' and 'age') and then each one of these
+    is going to get it's own type which is represented by U in each time.
+    - U can be any type expression 
+      - valid values of U in this case: it can be a constant type expression like `string` or `number` typeof env
+    - or it can be sth that depends on P
+      - valid values of U in this case: P, Env[P], T[P], conditional types that depends on P
+
+Now look at 15th file.
+
+TILL 1:32:00
 
 
 Learn: If we want to iterate over EACH CONSTITUENT of a union, we need to use a conditional type on that union that ALWAYS evaluates
