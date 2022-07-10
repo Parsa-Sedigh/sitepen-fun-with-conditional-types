@@ -412,7 +412,7 @@ So T[K1 | K2 | ... Kn]  becomes T[K1] | T[K2] | ... T[Kn]
 We can use the distributive aspect of indexed types for the answer of the question. The answer is we can an indexing operation that indexes over
 all the properties of Book. So we need to use all the properties of Book for the union to index it.
 
-Learn: The keyof operator gives us a union of all keys of an object.
+**Learn: The keyof operator gives us a union of all keys of an object.**
 
 # Safe get function
 Question: How can we make a function to get a value in an object safety?
@@ -491,8 +491,113 @@ Now look at 15th file.
 
 TILL 1:32:00
 
+Remember that we said some mapped types preserve structure? For example Pick<T, K> will preserve the strucutre of the type it's picking from?
+Preserving structure means for example if the original type is optional, the mapped type will also preserve that and would be optional.
+
+Now how does this structure preservation happen?
+**Look at 15th file and let's see if the Env type is gonna have the same modifiers as the type EnvGetters.**
+
+When we have [P in keyof EnvGetter]: U , we're mapping over keys of EnvGetters. 
+
+Why does modifiers preserve when mapping over types?
+When we have: `keyof EnvGetters`, it will evaluate to: `"SERVER" | "PORT"`. **BUTTT!** now if we look at the resulting type which is
+Env2, the modifiers are NOT preserved(for example if EnvGetters had a readonly modifier on one of it's properties, the mapped type won't have that), so if
+you look at Env2 here, it won't preserve the modifiers of T:
+```typescript
+type Env2 = {
+    [P in "SERVER" | "PORT"]: ReturnType<EnvGetters[P]>;
+};
+```
+So the fact that we're mapping over keyof [some type] actually turns out to be important(because in the first approach that preserves the modifiers,
+we had keyof [type] but in second one which we only use the union and not keyof, the modifiers are **not** preserved). It's not just the fact
+that that mapped type can be composed from the parts it's made. It's not just the sum of it's parts. Because you can say: Yeah `keyof type` means
+constituents of that type(that type is composed from it's consitutents), so in case we replace `keyof [type]` with `consituent 1| constituent 2 ...`, the
+modifiers should preserve in second case too. _But this is not the case at all!_
+
+**Important:** TS actually here detects the specialized pattern in which we're mapping over `keyof [type]` and it will say that: Ok, since you're mapping over
+the keys of this given type, I'm going to preserve all the modifiers that I find in this type for each one of the properties.
+
+There is another pattern that could be used for homophobic map types, for these map types that preserve structure. Namely instead of mapping 
+over the keys of a type, we could be mapping over a type parameter which is constrained to be the keys of a given type and again that given type will
+have it's modifiers preserved and this is actually what Pick does.
+
+If you look at Pick, we see that the mapping operation happens over K, where K is a type param that extends keyof T, so it must be one of the
+keys of the type T. This means since we have this pattern(having a type param which is constrained to the keys of a given type by using `keyof` and use that type param
+in with the `in` keyword when mapping happens), we will have the preservation of modifiers that come from the type T(the type which we map over):
+```typescript
+type Pick<T, K extends keyof T> = {
+    [P in K]: T[P];
+};
+```
+
+We saw that by default if we use `keyof [some type]` in the mapping, then the modifiers are preserved(but with). But what if we want to explicitly add modifiers?
+We can just add the modifier in the mapping expression([P in keyof ...]). For example to make all properties readonly(add readonly modifier to all properties):
+```typescript
+type Env = {
+    readonly [P in keyof U]: U[P];
+};
+```
+
+What if we want to remove a modifier when mapping over properties?
+```typescript
+type Env = {
+    -readonly[P in keyof U]-?: U[P];
+};
+```
+Here, we're removing the optional from all the properties. So if we added only `?` there, it adds the modifier, -? will remove the modifier. We could also
+use `+?` for adding the modifier instead of only `?`. Also the above code removes the readonly modifier.
+
+Tip: NonNullable will take a union and remove all the `undefined` and `null`s from that union.
+For example: 
+`type A = NonNullable<() => string | undefined>;`
+
+Note: I want to stress the syntactic nature of these homomorphic mapped types. Namely that we **MUST** map over `keyof [some type]`. It's NOT ENOUGH for
+the type we're mapping over to be some alias and if it was an alias, the structure preservation behavior won't work and therefore the modifiers of the 
+resulted type won't be preserved, for example:
+```typescript
+type K = keyof EnvGetters;
+type Env = {
+    [P in K]: K[P];
+};
+```
+Now the modifiers of EnvGetters won't be preserved for Env. Because Env is no longer a homomorphic mapped typed, it deosn't preserve structure. Why?
+Because it's not mapping over `keyof [type]`.
+
+So the `keyof [type]` has to be there **EXPLICITLY** and aliasing it with some other type won't preserve the structure of mapped type.
+
+### Homomorphic mapped types
+Some mapped types preserve structure and these are called homophobic mapped types and they're dependent on the SYNTAX we use for mapping(which that syntax
+is using keyof [type] for mapping EXPLICITLY).
+
+`{ [P in keyof T]: U }`
+
+`[P in keyof T]` is the mapping expression.
+
+type G<K extends keyof T> = { [P in K]: U }
+
+- homomorphic mapped types preserve structure
+- the type use in the `in` clause is(the two situations where modifiers are preserved in mapping):
+  - `keyof T` - the modifiers of T are preserved
+  - a type parameter that `extends keyof T` - the modifiers of T are preserved
+
+### manipulating modifiers
+- `{ readonly [P in keyof T]: U }` - adds `readonly` modifier to the resuling type
+- `{ -readonly [P in keyof T]: U }` - removes `readonly` modifier
+- `{ [P in keyof T] ?: U }` - adds ? modifier
+- `{ [P in keyof T]-?: U }` - removes ? modifier
+
+## conditional types
+Question: How can we correctly type a function that return a string or a number based on the type of a passed in parameter?
+Answer: We can use conditional types(another option is to use overloads).
+Look at 16th file.
+
+What are conditional types?
+In TS we can make decisions as to what the type should be, based on other types.
+
+TILL 1:43:00
+
 
 Learn: If we want to iterate over EACH CONSTITUENT of a union, we need to use a conditional type on that union that ALWAYS evaluates
 to true. So if U is a union type and we want to iterate over each constituent type of this union, we use a conditional type on this union
 that always evaluates to true:
-type T = U extends U ? (here, we can take some decision to assign what type to each constituent) : never;
+`type T = U extends U ? (here, we can take some decision to assign what type to each constituent) : never;`
